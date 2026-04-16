@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Login Screen](https://portal.scoggins.digital/login)
+![Login Screen](screenshots/login.png)
 
 **A production-ready client portal for [Scoggins Digital](https://scoggins.digital)**
 
