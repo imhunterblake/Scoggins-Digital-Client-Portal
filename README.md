@@ -33,7 +33,7 @@ The Scoggins Digital Client Portal eliminates the friction of managing web proje
 
 The portal uses passwordless magic link authentication — no password required.
 
-![Scoggins Digital Client Portal Login](docs/login.png)
+![Scoggins Digital Client Portal Login](screenshots/login.png)
 
 > **Live:** [portal.scoggins.digital/login](https://portal.scoggins.digital/login)
 
