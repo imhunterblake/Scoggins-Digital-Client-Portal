@@ -89,7 +89,13 @@ function DashboardTab({ project, profile }) {
   const milestones = project.milestones || [];
   const completed = milestones.filter((m) => m.completed).length;
   const todos = [
-    { id: "contract", label: "Sign contract", done: true },
+    {
+      id: "contract",
+      label: "Sign contract",
+      done:
+        project?.milestones?.find((m) => m.label === "Contract Signed")
+          ?.completed || false,
+    },
     { id: "deposit", label: "Pay deposit", done: !!project.deposit_received },
     {
       id: "assets",
@@ -234,30 +240,33 @@ function DashboardTab({ project, profile }) {
 }
 
 // ── ASSETS TAB ────────────────────────────────────────────────
+// Drop this entire function into ClientDashboard.jsx replacing the existing AssetsTab
+
 function AssetsTab({ project }) {
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState({ logo: false, photos: false });
   const [videoUrl, setVideoUrl] = useState("");
   const [videoLabel, setVideoLabel] = useState("");
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [assets, setAssets] = useState(project?.assets || []);
-  const fileRef = useRef();
+  const [pendingAssets, setPendingAssets] = useState([]); // staged but not submitted
+  const [submitted, setSubmitted] = useState(false);
+  const [deleting, setDeleting] = useState(null);
 
-  const ACCEPT = {
-    photos: "image/*",
-    logo: "image/*,.svg",
-    video: "video/*",
-    doc: ".pdf,.doc,.docx",
-  };
+  const logoRef = useRef();
+  const photosRef = useRef();
 
   async function handleUpload(e, type) {
     const files = Array.from(e.target.files);
     if (!files.length || !project) return;
-    setUploading(true);
+    setUploading((u) => ({ ...u, [type]: true }));
+    const newAssets = [];
     for (const file of files) {
       const { data, error } = await uploadAsset(project.id, file, type);
-      if (!error && data) setAssets((prev) => [...prev, data]);
+      if (!error && data) newAssets.push(data);
     }
-    setUploading(false);
+    // Add to pending (staged) list, not live list yet
+    setPendingAssets((prev) => [...prev, ...newAssets]);
+    setUploading((u) => ({ ...u, [type]: false }));
     e.target.value = "";
   }
 
@@ -269,6 +278,7 @@ function AssetsTab({ project }) {
       videoLabel || "Hero Video",
     );
     if (!error && data) {
+      // Video URLs go live immediately (no staging needed)
       setAssets((prev) => [...prev, data]);
       setVideoUrl("");
       setVideoLabel("");
@@ -276,11 +286,38 @@ function AssetsTab({ project }) {
     }
   }
 
-  const byType = (type) =>
-    assets.filter(
-      (a) =>
-        a.type === type || (type === "video_url" && a.type === "video_url"),
-    );
+  async function handleRemovePending(assetId) {
+    // Remove from pending list and delete from storage
+    setDeleting(assetId);
+    const { error } = await supabase.from("assets").delete().eq("id", assetId);
+    if (!error) {
+      setPendingAssets((prev) => prev.filter((a) => a.id !== assetId));
+    }
+    setDeleting(null);
+  }
+
+  async function handleRemoveLive(assetId) {
+    setDeleting(assetId);
+    const { error } = await supabase.from("assets").delete().eq("id", assetId);
+    if (!error) {
+      setAssets((prev) => prev.filter((a) => a.id !== assetId));
+    }
+    setDeleting(null);
+  }
+
+  function handleSubmitAssets() {
+    // Move pending to live
+    setAssets((prev) => [...prev, ...pendingAssets]);
+    setPendingAssets([]);
+    setSubmitted(true);
+    setTimeout(() => setSubmitted(false), 3000);
+  }
+
+  const livePhotos = assets.filter((a) => a.type === "photos");
+  const liveLogo = assets.filter((a) => a.type === "logo");
+  const liveVideos = assets.filter((a) => a.type === "video_url");
+  const pendingPhotos = pendingAssets.filter((a) => a.type === "photos");
+  const pendingLogo = pendingAssets.filter((a) => a.type === "logo");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -289,84 +326,224 @@ function AssetsTab({ project }) {
           My Assets
         </h1>
         <p className="text-white/40 text-sm font-display">
-          Upload your logo, photos, and video here. Hunter can download
-          everything directly from this portal.
+          Upload your logo and photos below. Review them, remove any mistakes,
+          then hit Submit when ready.
         </p>
       </div>
 
       {/* Upload zones */}
       <div className="grid grid-cols-2 gap-4">
-        {[
-          {
-            type: "logo",
-            icon: "🎨",
-            label: "Logo",
-            sub: "PNG, JPG, or SVG preferred",
-            accept: ACCEPT.logo,
-          },
-          {
-            type: "photos",
-            icon: "📸",
-            label: "Photos",
-            sub: "Dog photos, kennel photos, action shots",
-            accept: ACCEPT.photos,
-            multiple: true,
-          },
-        ].map(({ type, icon, label, sub, accept, multiple }) => (
-          <div key={type}>
-            <input
-              ref={fileRef}
-              type="file"
-              accept={accept}
-              multiple={multiple}
-              className="hidden"
-              id={`upload-${type}`}
-              onChange={(e) => handleUpload(e, type)}
-            />
-            <label
-              htmlFor={`upload-${type}`}
-              className="card p-5 flex flex-col items-center gap-3 cursor-pointer
-                         hover:border-brand-cyan/30 hover:bg-brand-cyan/5 transition-all border-dashed
-                         text-center block"
-            >
-              <span className="text-3xl">{icon}</span>
-              <div>
-                <p className="font-display font-semibold text-white text-sm">
-                  {label}
-                </p>
-                <p className="text-white/30 text-xs">{sub}</p>
-              </div>
-              <span className="btn-primary text-xs px-4 py-2">
-                {uploading ? "Uploading..." : `Upload ${label}`}
-              </span>
-            </label>
-            {/* Uploaded files */}
-            {byType(type).length > 0 && (
-              <div className="mt-2 space-y-1">
-                {byType(type).map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/3"
-                  >
-                    <span className="text-sm">📎</span>
-                    <a
-                      href={a.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-mono text-brand-cyan hover:text-brand-cyan-glow truncate flex-1"
-                    >
-                      {a.name}
-                    </a>
-                    <span className="text-white/20 text-xs">
-                      {formatBytes(a.size_bytes)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* LOGO */}
+        <div>
+          <input
+            ref={logoRef}
+            type="file"
+            accept="image/*,.svg"
+            className="hidden"
+            onChange={(e) => handleUpload(e, "logo")}
+          />
+          <div
+            onClick={() => logoRef.current?.click()}
+            className="card p-5 flex flex-col items-center gap-3 cursor-pointer
+                       hover:border-brand-cyan/30 hover:bg-brand-cyan/5 transition-all border-dashed text-center"
+          >
+            <span className="text-3xl">🎨</span>
+            <div>
+              <p className="font-display font-semibold text-white text-sm">
+                Logo
+              </p>
+              <p className="text-white/30 text-xs">
+                PNG, JPG, or SVG preferred
+              </p>
+            </div>
+            <span className="btn-primary text-xs px-4 py-2">
+              {uploading.logo ? "Uploading..." : "Upload Logo"}
+            </span>
           </div>
-        ))}
+
+          {/* Pending logo */}
+          {pendingLogo.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="font-mono text-xs text-yellow-400/70 px-1">
+                ⏳ Staged — not submitted yet
+              </p>
+              {pendingLogo.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-400/5 border border-yellow-400/20"
+                >
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-mono text-brand-cyan hover:text-brand-cyan-glow truncate flex-1"
+                  >
+                    {a.name}
+                  </a>
+                  <button
+                    onClick={() => handleRemovePending(a.id)}
+                    disabled={deleting === a.id}
+                    className="text-red-400/60 hover:text-red-400 text-xs px-2 py-1 rounded transition-colors"
+                  >
+                    {deleting === a.id ? "..." : "✕ Remove"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Live logo */}
+          {liveLogo.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {liveLogo.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/3 border border-white/5"
+                >
+                  <span className="text-sm">🎨</span>
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-mono text-brand-cyan hover:text-brand-cyan-glow truncate flex-1"
+                  >
+                    {a.name}
+                  </a>
+                  <button
+                    onClick={() => handleRemoveLive(a.id)}
+                    disabled={deleting === a.id}
+                    className="text-red-400/40 hover:text-red-400 text-xs px-2 py-1 rounded transition-colors"
+                  >
+                    {deleting === a.id ? "..." : "✕"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* PHOTOS */}
+        <div>
+          <input
+            ref={photosRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleUpload(e, "photos")}
+          />
+          <div
+            onClick={() => photosRef.current?.click()}
+            className="card p-5 flex flex-col items-center gap-3 cursor-pointer
+                       hover:border-brand-cyan/30 hover:bg-brand-cyan/5 transition-all border-dashed text-center"
+          >
+            <span className="text-3xl">📸</span>
+            <div>
+              <p className="font-display font-semibold text-white text-sm">
+                Photos
+              </p>
+              <p className="text-white/30 text-xs">
+                Dog photos, kennel photos, action shots
+              </p>
+            </div>
+            <span className="btn-primary text-xs px-4 py-2">
+              {uploading.photos ? "Uploading..." : "Upload Photos"}
+            </span>
+          </div>
+
+          {/* Pending photos */}
+          {pendingPhotos.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="font-mono text-xs text-yellow-400/70 px-1">
+                ⏳ Staged — not submitted yet
+              </p>
+              {pendingPhotos.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-400/5 border border-yellow-400/20"
+                >
+                  <span className="text-sm">📸</span>
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-mono text-brand-cyan hover:text-brand-cyan-glow truncate flex-1"
+                  >
+                    {a.name}
+                  </a>
+                  <button
+                    onClick={() => handleRemovePending(a.id)}
+                    disabled={deleting === a.id}
+                    className="text-red-400/60 hover:text-red-400 text-xs px-2 py-1 rounded transition-colors"
+                  >
+                    {deleting === a.id ? "..." : "✕ Remove"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Live photos */}
+          {livePhotos.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {livePhotos.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/3 border border-white/5"
+                >
+                  <span className="text-sm">📸</span>
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-mono text-brand-cyan hover:text-brand-cyan-glow truncate flex-1"
+                  >
+                    {a.name}
+                  </a>
+                  <button
+                    onClick={() => handleRemoveLive(a.id)}
+                    disabled={deleting === a.id}
+                    className="text-red-400/40 hover:text-red-400 text-xs px-2 py-1 rounded transition-colors"
+                  >
+                    {deleting === a.id ? "..." : "✕"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Submit staged assets */}
+      {pendingAssets.length > 0 && (
+        <div className="card p-4 border-brand-cyan/20 bg-brand-cyan/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-display font-semibold text-white text-sm">
+                {pendingAssets.length} file{pendingAssets.length > 1 ? "s" : ""}{" "}
+                staged
+              </p>
+              <p className="text-white/40 text-xs font-display mt-0.5">
+                Review above, remove any mistakes, then submit when ready.
+              </p>
+            </div>
+            <button
+              onClick={handleSubmitAssets}
+              className="btn-primary px-5 py-2 text-sm"
+            >
+              ✓ Submit Assets
+            </button>
+          </div>
+        </div>
+      )}
+
+      {submitted && (
+        <div className="card p-4 border-green-500/20 bg-green-500/5 text-center">
+          <p className="font-display text-green-400 text-sm">
+            ✓ Assets submitted! Hunter will be notified.
+          </p>
+        </div>
+      )}
 
       {/* Video URL */}
       <div className="card p-5">
@@ -386,9 +563,9 @@ function AssetsTab({ project }) {
             + Add YouTube Link
           </button>
         </div>
-        {byType("video_url").length > 0 ?
+        {liveVideos.length > 0 ?
           <div className="space-y-2">
-            {byType("video_url").map((a) => (
+            {liveVideos.map((a) => (
               <div
                 key={a.id}
                 className="flex items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/5"
@@ -405,6 +582,13 @@ function AssetsTab({ project }) {
                     {a.url}
                   </a>
                 </div>
+                <button
+                  onClick={() => handleRemoveLive(a.id)}
+                  disabled={deleting === a.id}
+                  className="text-red-400/40 hover:text-red-400 text-xs px-2 py-1 rounded transition-colors"
+                >
+                  {deleting === a.id ? "..." : "✕"}
+                </button>
               </div>
             ))}
           </div>
@@ -459,7 +643,6 @@ function AssetsTab({ project }) {
     </div>
   );
 }
-
 // ── FEEDBACK TAB ──────────────────────────────────────────────
 function FeedbackTab({ project }) {
   const [messages, setMessages] = useState([]);

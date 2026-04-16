@@ -111,6 +111,19 @@ function ProjectDetail({ project, onClose, onUpdate }) {
     setSaving(true);
     const { data } = await updateProject(project.id, form);
     if (data) onUpdate(data);
+
+    // Also update profile fields if they were changed
+    if (form.first_name || form.last_name || form.business_name) {
+      await supabaseAdmin
+        .from("profiles")
+        .update({
+          first_name: form.first_name || project.profiles?.first_name,
+          last_name: form.last_name || project.profiles?.last_name,
+          business_name: form.business_name || project.profiles?.business_name,
+        })
+        .eq("id", project.client_id);
+    }
+
     setSaving(false);
   }
 
@@ -234,6 +247,52 @@ function ProjectDetail({ project, onClose, onUpdate }) {
                   />
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">First Name</label>
+                  <input
+                    className="input"
+                    defaultValue={project.profiles?.first_name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, first_name: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Last Name</label>
+                  <input
+                    className="input"
+                    defaultValue={project.profiles?.last_name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, last_name: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Business Name</label>
+                  <input
+                    className="input"
+                    defaultValue={project.profiles?.business_name}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, business_name: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Total Price ($)</label>
+                  <input
+                    className="input"
+                    type="number"
+                    defaultValue={project.total_price}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        total_price: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
               <div className="flex gap-4 flex-wrap">
                 {[
                   { key: "deposit_received", label: "Deposit Received" },
@@ -266,6 +325,41 @@ function ProjectDetail({ project, onClose, onUpdate }) {
                 className="btn-primary"
               >
                 {saving ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      `Delete ${project.profiles?.first_name} ${project.profiles?.last_name}? This cannot be undone.`,
+                    )
+                  )
+                    return;
+                  await supabaseAdmin
+                    .from("milestones")
+                    .delete()
+                    .eq("project_id", project.id);
+                  await supabaseAdmin
+                    .from("assets")
+                    .delete()
+                    .eq("project_id", project.id);
+                  await supabaseAdmin
+                    .from("feedback")
+                    .delete()
+                    .eq("project_id", project.id);
+                  await supabaseAdmin
+                    .from("projects")
+                    .delete()
+                    .eq("id", project.id);
+                  await supabaseAdmin
+                    .from("profiles")
+                    .delete()
+                    .eq("id", project.client_id);
+                  onClose();
+                  window.location.reload();
+                }}
+                className="w-full py-2 rounded-xl border border-red-500/20 text-red-400/60 hover:text-red-400 hover:border-red-500/40 text-sm font-display transition-colors"
+              >
+                Delete Client & Project
               </button>
             </div>
           )}
