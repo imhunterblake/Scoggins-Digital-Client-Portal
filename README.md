@@ -1,7 +1,7 @@
 # Scoggins Digital
 
 > Freelance web development business website — built for small businesses and healthcare practices.
-
+ 
 ![Scoggins Digital Hero](screenshots/Scoggins-Digital.png)
 
 ---
