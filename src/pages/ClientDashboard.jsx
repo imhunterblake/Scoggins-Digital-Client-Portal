@@ -22,16 +22,24 @@ import {
 
 // ── SIDEBAR ────────────────────────────────────────────────────
 function Sidebar({ active, setActive, onSignOut }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const nav = [
     { id: "dashboard", icon: "⊞", label: "Dashboard" },
     { id: "assets", icon: "📁", label: "My Assets" },
     { id: "feedback", icon: "💬", label: "Feedback" },
     { id: "timeline", icon: "📋", label: "Timeline" },
   ];
-  return (
-    <aside className="w-56 flex-shrink-0 flex flex-col border-r border-white/5 bg-brand-darker/50">
+
+  function handleNav(id) {
+    setActive(id);
+    setMobileOpen(false); // close sidebar on mobile after tapping a nav item
+  }
+
+  const sidebarContent = (
+    <>
       {/* Logo */}
-      <div className="p-5 border-b border-white/5">
+      <div className="p-5 border-b border-white/5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Logo size={34} />
           <div>
@@ -41,6 +49,13 @@ function Sidebar({ active, setActive, onSignOut }) {
             <p className="font-mono text-white/30 text-xs">Scoggins Digital</p>
           </div>
         </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden text-white/30 hover:text-white text-2xl leading-none"
+        >
+          ×
+        </button>
       </div>
 
       {/* Nav */}
@@ -48,7 +63,7 @@ function Sidebar({ active, setActive, onSignOut }) {
         {nav.map((item) => (
           <button
             key={item.id}
-            onClick={() => setActive(item.id)}
+            onClick={() => handleNav(item.id)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-display transition-all
               ${
                 active === item.id ?
@@ -71,7 +86,53 @@ function Sidebar({ active, setActive, onSignOut }) {
           <span>↩</span> Sign Out
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ── DESKTOP sidebar — always visible on md+ ── */}
+      <aside className="hidden md:flex w-56 flex-shrink-0 flex-col border-r border-white/5 bg-brand-darker/50">
+        {sidebarContent}
+      </aside>
+
+      {/* ── MOBILE top bar ── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-brand-darker border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <Logo size={28} />
+          <p className="font-display font-semibold text-white text-sm">
+            Client Portal
+          </p>
+        </div>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="flex flex-col gap-1.5 p-2"
+          aria-label="Open menu"
+        >
+          <span className="w-5 h-0.5 bg-white/60 block" />
+          <span className="w-5 h-0.5 bg-white/60 block" />
+          <span className="w-5 h-0.5 bg-white/60 block" />
+        </button>
+      </div>
+
+      {/* ── MOBILE drawer overlay ── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 flex"
+          onClick={() => setMobileOpen(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          {/* Drawer */}
+          <aside
+            className="relative w-64 flex flex-col bg-brand-darker border-r border-white/5 h-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -880,50 +941,117 @@ function TimelineTab({ project }) {
 }
 
 // ── CLIENT DASHBOARD ROOT ─────────────────────────────────────
-export default function ClientDashboard() {
-  const { profile, session } = useAuth();
-  const [tab, setTab] = useState("dashboard");
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
+function Sidebar({ active, setActive, onSignOut }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  useEffect(() => {
-    if (!session?.user?.id) return;
-    getClientProject(session.user.id).then(({ data }) => {
-      setProject(data);
-      setLoading(false);
-    });
-  }, [session?.user?.id]);
+  const nav = [
+    { id: "dashboard", icon: "⊞", label: "Dashboard" },
+    { id: "assets", icon: "📁", label: "My Assets" },
+    { id: "feedback", icon: "💬", label: "Feedback" },
+    { id: "timeline", icon: "📋", label: "Timeline" },
+  ];
 
-  async function handleSignOut() {
-    await signOut();
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.replace("/login");
+  function handleNav(id) {
+    setActive(id);
+    setMobileOpen(false); // close sidebar on mobile after tapping a nav item
   }
 
-  if (loading)
-    return (
-      <div className="min-h-screen bg-brand-dark grid-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-brand-cyan/30 border-t-brand-cyan rounded-full animate-spin mx-auto mb-4" />
-          <p className="font-mono text-white/30 text-sm">
-            Loading your portal...
-          </p>
+  const sidebarContent = (
+    <>
+      {/* Logo */}
+      <div className="p-5 border-b border-white/5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Logo size={34} />
+          <div>
+            <p className="font-display font-semibold text-white text-sm">
+              Client Portal
+            </p>
+            <p className="font-mono text-white/30 text-xs">Scoggins Digital</p>
+          </div>
         </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden text-white/30 hover:text-white text-2xl leading-none"
+        >
+          ×
+        </button>
       </div>
-    );
+
+      {/* Nav */}
+      <nav className="flex-1 p-3 space-y-1">
+        {nav.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => handleNav(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-display transition-all
+              ${
+                active === item.id ?
+                  "bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/20"
+                : "text-white/40 hover:text-white hover:bg-white/3"
+              }`}
+          >
+            <span className="text-base">{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Sign out */}
+      <div className="p-3 border-t border-white/5">
+        <button
+          onClick={onSignOut}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-display text-white/30 hover:text-white/60 transition-colors"
+        >
+          <span>↩</span> Sign Out
+        </button>
+      </div>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-brand-dark grid-bg flex">
-      <Sidebar active={tab} setActive={setTab} onSignOut={handleSignOut} />
-      <main className="flex-1 p-8 overflow-y-auto">
-        {tab === "dashboard" && (
-          <DashboardTab project={project} profile={profile} />
-        )}
-        {tab === "assets" && <AssetsTab project={project} />}
-        {tab === "feedback" && <FeedbackTab project={project} />}
-        {tab === "timeline" && <TimelineTab project={project} />}
-      </main>
-    </div>
+    <>
+      {/* ── DESKTOP sidebar — always visible on md+ ── */}
+      <aside className="hidden md:flex w-56 flex-shrink-0 flex-col border-r border-white/5 bg-brand-darker/50">
+        {sidebarContent}
+      </aside>
+
+      {/* ── MOBILE top bar ── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-brand-darker border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <Logo size={28} />
+          <p className="font-display font-semibold text-white text-sm">
+            Client Portal
+          </p>
+        </div>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="flex flex-col gap-1.5 p-2"
+          aria-label="Open menu"
+        >
+          <span className="w-5 h-0.5 bg-white/60 block" />
+          <span className="w-5 h-0.5 bg-white/60 block" />
+          <span className="w-5 h-0.5 bg-white/60 block" />
+        </button>
+      </div>
+
+      {/* ── MOBILE drawer overlay ── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 flex"
+          onClick={() => setMobileOpen(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          {/* Drawer */}
+          <aside
+            className="relative w-64 flex flex-col bg-brand-darker border-r border-white/5 h-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
