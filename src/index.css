@@ -74,3 +74,61 @@
   animation: shimmer 1.5s linear infinite;
   border-radius: 8px;
 }
+
+/* ── MOBILE RESPONSIVE — paste at the bottom of index.css ── */
+
+@media (max-width: 767px) {
+
+  /* ── LOGIN PAGE ── */
+  .min-h-screen.grid-bg {
+    padding: 16px;
+  }
+
+  /* ── ADMIN DASHBOARD ── */
+  /* Hide admin sidebar on mobile, show hamburger */
+  .admin-sidebar {
+    display: none !important;
+  }
+  .admin-topbar {
+    display: flex !important;
+  }
+  .admin-main {
+    padding: 72px 16px 16px !important;
+  }
+
+  /* Stats grid — 1 column on mobile */
+  .grid.grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Client list cards — simplify on mobile */
+  .client-card-meta {
+    display: none !important;
+  }
+
+  /* Project detail panel — full screen on mobile */
+  .project-detail-panel {
+    max-width: 100% !important;
+  }
+
+  /* ── CLIENT DASHBOARD ── */
+  /* 2-col grids become 1-col */
+  .grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Feedback messages max-width */
+  .max-w-sm {
+    max-width: 85vw !important;
+  }
+
+  /* Cards get less padding */
+  .card {
+    padding: 16px !important;
+  }
+
+  /* Feedback height fix */
+  .feedback-container {
+    height: calc(100vh - 200px) !important;
+  }
+}
