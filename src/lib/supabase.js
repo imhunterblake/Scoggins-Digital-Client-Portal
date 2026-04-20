@@ -4,15 +4,10 @@ const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || "https://your-project.supabase.co";
 const SUPABASE_ANON_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY || "your-anon-key";
-// Service role key — needed for admin.inviteUserByEmail
-// Add to .env as VITE_SUPABASE_SERVICE_KEY (never commit to GitHub)
 const SUPABASE_SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_KEY || "";
 
-// Regular client — used for all client-side operations
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Admin client — used only for server-side admin operations like inviting users
-// Falls back to regular client if service key not set
 export const supabaseAdmin =
   SUPABASE_SERVICE_KEY ?
     createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
@@ -20,13 +15,11 @@ export const supabaseAdmin =
     })
   : supabase;
 
-// Auth helpers
+// ── AUTH ──────────────────────────────────────────────────────
 export async function sendMagicLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: {
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
-    },
+    options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
   });
   return { error };
 }
@@ -43,7 +36,7 @@ export async function getSession() {
   return session;
 }
 
-// Profile helpers
+// ── PROFILES ──────────────────────────────────────────────────
 export async function getProfile(userId) {
   const { data, error } = await supabase
     .from("profiles")
@@ -53,23 +46,38 @@ export async function getProfile(userId) {
   return { data, error };
 }
 
-// Project helpers
+// ── PROJECTS ─────────────────────────────────────────────────
+// Optimized: no feedback on initial load — fetch lazily in FeedbackTab
 export async function getClientProject(userId) {
   const { data, error } = await supabase
     .from("projects")
-    .select("*, milestones(*), assets(*), feedback(*)")
+    .select("*, milestones(*), assets(*)") // removed feedback(*) — load on demand
     .eq("client_id", userId)
+    .order("created_at", { ascending: false, foreignTable: "milestones" })
     .single();
   return { data, error };
 }
 
+// Optimized: no milestones/assets/feedback on the list view — just what the card needs
 export async function getAllProjects() {
+  const { data, error } = await supabase
+    .from("projects")
+    .select(
+      "id, name, project_type, status, progress, total_price, kickoff_date, est_completion, deposit_received, final_payment_received, client_id, profiles(first_name, last_name, business_name, email)",
+    )
+    .order("created_at", { ascending: false });
+  return { data, error };
+}
+
+// Load full project detail only when admin opens the slide panel
+export async function getProjectDetail(projectId) {
   const { data, error } = await supabase
     .from("projects")
     .select(
       "*, profiles(first_name, last_name, business_name, email), milestones(*), assets(*)",
     )
-    .order("created_at", { ascending: false });
+    .eq("id", projectId)
+    .single();
   return { data, error };
 }
 
@@ -92,7 +100,7 @@ export async function createProject(projectData) {
   return { data, error };
 }
 
-// Milestones
+// ── MILESTONES ────────────────────────────────────────────────
 export async function updateMilestone(milestoneId, updates) {
   const { data, error } = await supabase
     .from("milestones")
@@ -103,7 +111,7 @@ export async function updateMilestone(milestoneId, updates) {
   return { data, error };
 }
 
-// Assets
+// ── ASSETS ───────────────────────────────────────────────────
 export async function uploadAsset(projectId, file, type) {
   const ext = file.name.split(".").pop();
   const path = `${projectId}/${type}/${Date.now()}.${ext}`;
@@ -111,7 +119,6 @@ export async function uploadAsset(projectId, file, type) {
   const { error: uploadError } = await supabase.storage
     .from("client-assets")
     .upload(path, file);
-
   if (uploadError) return { error: uploadError };
 
   const {
@@ -129,7 +136,6 @@ export async function uploadAsset(projectId, file, type) {
     })
     .select()
     .single();
-
   return { data, error };
 }
 
@@ -147,15 +153,11 @@ export async function addVideoUrl(projectId, url, label) {
   return { data, error };
 }
 
-// Feedback
+// ── FEEDBACK ──────────────────────────────────────────────────
 export async function submitFeedback(projectId, message, fromAdmin = false) {
   const { data, error } = await supabase
     .from("feedback")
-    .insert({
-      project_id: projectId,
-      message,
-      from_admin: fromAdmin,
-    })
+    .insert({ project_id: projectId, message, from_admin: fromAdmin })
     .select()
     .single();
   return { data, error };
@@ -170,9 +172,8 @@ export async function getFeedback(projectId) {
   return { data, error };
 }
 
-// Invite a new client (admin only)
+// ── INVITE ───────────────────────────────────────────────────
 export async function inviteClient(email, projectData) {
-  // Creates auth user via magic link + sets up their profile and project
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(email);
   return { data, error };
 }
