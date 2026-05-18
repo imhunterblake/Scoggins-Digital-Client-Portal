@@ -8,7 +8,9 @@ function getCachedProfile() {
   try {
     const cached = sessionStorage.getItem("sd_profile");
     return cached ? JSON.parse(cached) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 function setCachedProfile(profile) {
@@ -37,7 +39,9 @@ export function AuthProvider({ children }) {
     async function init() {
       try {
         // getSession reads from localStorage — instant, no network needed
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
         if (!mounted) return;
         setSession(session);
@@ -66,37 +70,40 @@ export function AuthProvider({ children }) {
 
     init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-        if (event === "TOKEN_REFRESHED") return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      if (event === "TOKEN_REFRESHED") return;
 
-        if (event === "SIGNED_OUT") {
-          setSession(null);
+      if (event === "SIGNED_OUT") {
+        setSession(null);
+        setProfile(null);
+        setCachedProfile(null);
+        loadedUserIdRef.current = null;
+        setLoading(false);
+        return;
+      }
+
+      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+        setSession(session);
+        if (session?.user?.id) {
+          // Skip reload if already loaded for this user (cross-tab broadcast)
+          if (
+            event === "SIGNED_IN" &&
+            loadedUserIdRef.current === session.user.id
+          ) {
+            return;
+          }
+          await loadProfileWithRetry(session.user.id, mounted);
+        } else {
           setProfile(null);
           setCachedProfile(null);
           loadedUserIdRef.current = null;
           setLoading(false);
-          return;
-        }
-
-        if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-          setSession(session);
-          if (session?.user?.id) {
-            // Skip reload if already loaded for this user (cross-tab broadcast)
-            if (event === "SIGNED_IN" && loadedUserIdRef.current === session.user.id) {
-              return;
-            }
-            await loadProfileWithRetry(session.user.id, mounted);
-          } else {
-            setProfile(null);
-            setCachedProfile(null);
-            loadedUserIdRef.current = null;
-            setLoading(false);
-          }
         }
       }
-    );
+    });
 
     return () => {
       mounted = false;
@@ -114,18 +121,21 @@ export function AuthProvider({ children }) {
 
       try {
         const { data, error } = await Promise.race([
-          supabase.from("profiles").select("*").eq("id", userId).single(),
+          supabase.from("profiles").select("*").eq("id", userId).limit(1), // ← no .then() — let the full { data, error } come through
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("timeout")), 8000)
+            setTimeout(() => reject(new Error("timeout")), 8000),
           ),
         ]);
 
         if (!mounted) return;
 
         if (error) {
-          console.error(`Profile fetch error (attempt ${attempt}/${MAX_ATTEMPTS}):`, error.message);
+          console.error(
+            `Profile fetch error (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+            error.message,
+          );
           if (attempt < MAX_ATTEMPTS) {
-            await new Promise(r => setTimeout(r, RETRY_DELAY));
+            await new Promise((r) => setTimeout(r, RETRY_DELAY));
             continue;
           }
           if (!silent) {
@@ -137,17 +147,21 @@ export function AuthProvider({ children }) {
           return;
         }
 
+        const profileData = data?.[0] || null;
+
         // Success — update state and cache
-        setProfile(data);
-        setCachedProfile(data);
+        setProfile(profileData);
+        setCachedProfile(profileData);
         loadedUserIdRef.current = userId;
         if (!silent) setLoading(false);
         return;
-
       } catch (err) {
-        console.error(`Profile fetch exception (attempt ${attempt}/${MAX_ATTEMPTS}):`, err.message);
+        console.error(
+          `Profile fetch exception (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+          err.message,
+        );
         if (attempt < MAX_ATTEMPTS) {
-          await new Promise(r => setTimeout(r, RETRY_DELAY));
+          await new Promise((r) => setTimeout(r, RETRY_DELAY));
           continue;
         }
         if (mounted && !silent) {

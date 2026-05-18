@@ -70,7 +70,7 @@ export default function ReferralTab({ project, clientId }) {
       .from("profiles")
       .select("referral_credits, referral_credits_used")
       .eq("id", clientId)
-      .single();
+      .maybeSingle()
 
     setReferrals(refs || []);
     setCredits({
@@ -399,3 +399,6 @@ export default function ReferralTab({ project, clientId }) {
     </div>
   );
 }
+
+const { error } = await supabase.from('referrals').insert({...})
+if (error) console.error('Referral insert error:', error) // ← add this
