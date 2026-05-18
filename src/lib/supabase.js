@@ -14,8 +14,7 @@ export const supabaseAdmin =
       auth: {
         autoRefreshToken: false,
         persistSession: false,
-        persistSession: false,
-        autoRefreshToken: false,
+        storageKey: "sb-admin-auth", // ← unique key stops the conflict
       },
     })
   : supabase;
@@ -47,7 +46,7 @@ export async function getProfile(userId) {
     .from("profiles")
     .select("*")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
   return { data, error };
 }
 
@@ -220,7 +219,7 @@ export async function getReferralCredits(clientId) {
     .from("profiles")
     .select("referral_credits, referral_credits_used")
     .eq("id", clientId)
-    .single();
+    .maybeSingle();
   return { data, error };
 }
 
