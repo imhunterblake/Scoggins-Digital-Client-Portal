@@ -11,7 +11,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 export const supabaseAdmin =
   SUPABASE_SERVICE_KEY ?
     createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     })
   : supabase;
 
