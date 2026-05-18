@@ -177,3 +177,127 @@ export async function inviteClient(email, projectData) {
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(email);
   return { data, error };
 }
+
+// ── REFERRAL FUNCTIONS ────
+
+// Submit a new referral from the client portal
+export async function submitReferral(projectId, clientId, formData) {
+  const { data, error } = await supabase
+    .from("referrals")
+    .insert({
+      referring_client_id: clientId,
+      referring_project_id: projectId,
+      business_name: formData.businessName,
+      contact_name: formData.contactName,
+      email: formData.email,
+      phone: formData.phone,
+      notes: formData.notes,
+      status: "pending",
+    })
+    .select()
+    .single();
+  return { data, error };
+}
+
+// Get all referrals made by a specific client
+export async function getClientReferrals(clientId) {
+  const { data, error } = await supabase
+    .from("referrals")
+    .select("*")
+    .eq("referring_client_id", clientId)
+    .order("created_at", { ascending: false });
+  return { data, error };
+}
+
+// Get client's referral credit balance (from their profile)
+export async function getReferralCredits(clientId) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("referral_credits, referral_credits_used")
+    .eq("id", clientId)
+    .single();
+  return { data, error };
+}
+
+// ── ADMIN ONLY (use supabaseAdmin) ───────────────────────────
+
+// Get all referrals across all clients (admin view)
+export async function getAllReferrals() {
+  const { data, error } = await supabaseAdmin
+    .from("referrals")
+    .select(
+      `
+      *,
+      profiles!referring_client_id (
+        first_name, last_name, business_name, email
+      )
+    `,
+    )
+    .order("created_at", { ascending: false });
+  return { data, error };
+}
+
+// Update referral status — and auto-apply credit if converted
+export async function updateReferralStatus(referralId, status) {
+  const now = new Date().toISOString();
+  const updates = { status };
+
+  if (status === "contacted") updates.contacted_at = now;
+  if (status === "converted") updates.converted_at = now;
+
+  const { data, error } = await supabaseAdmin
+    .from("referrals")
+    .update(updates)
+    .eq("id", referralId)
+    .select()
+    .single();
+
+  if (error || !data) return { data, error };
+
+  // Auto-apply credit when converted
+  if (status === "converted" && !data.credit_applied) {
+    // Increment the referring client's credit balance
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("referral_credits")
+      .eq("id", data.referring_client_id)
+      .single();
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        referral_credits: (profile?.referral_credits || 0) + 1,
+      })
+      .eq("id", data.referring_client_id);
+
+    // Mark credit as applied on the referral record
+    await supabaseAdmin
+      .from("referrals")
+      .update({ credit_applied: true, credit_applied_at: now })
+      .eq("id", referralId);
+  }
+
+  return { data, error };
+}
+
+// Mark a maintenance credit as used (when you apply the free month)
+export async function useReferralCredit(clientId) {
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("referral_credits, referral_credits_used")
+    .eq("id", clientId)
+    .single();
+
+  if (!profile || profile.referral_credits <= profile.referral_credits_used) {
+    return { error: { message: "No credits available" } };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .update({ referral_credits_used: (profile.referral_credits_used || 0) + 1 })
+    .eq("id", clientId)
+    .select()
+    .single();
+
+  return { data, error };
+}
