@@ -130,7 +130,6 @@ export default function ReferralTab({ project, clientId }) {
         notes: "",
       });
       loadData();
-      setTimeout(() => setSubmitted(false), 8000);
     } else {
       setInsertError(error?.message || error?.code || JSON.stringify(error));
     }
