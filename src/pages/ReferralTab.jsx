@@ -50,6 +50,7 @@ export default function ReferralTab({ project, clientId }) {
     notes: "",
   });
   const [errors, setErrors] = useState({});
+  const [insertError, setInsertError] = useState(null);
 
   useEffect(() => {
     if (!clientId) return;
@@ -109,9 +110,17 @@ export default function ReferralTab({ project, clientId }) {
       status: "pending",
     });
 
+    console.error(
+      "Insert result:",
+      JSON.stringify(error),
+      "clientId:",
+      clientId,
+    );
+
     setSubmitting(false);
 
     if (!error) {
+      setInsertError(null);
       setSubmitted(true);
       setForm({
         businessName: "",
@@ -121,8 +130,9 @@ export default function ReferralTab({ project, clientId }) {
         notes: "",
       });
       loadData();
-      // Reset thank-you after 8 seconds so they can submit another
       setTimeout(() => setSubmitted(false), 8000);
+    } else {
+      setInsertError(error?.message || error?.code || JSON.stringify(error));
     }
   }
 
@@ -321,6 +331,14 @@ export default function ReferralTab({ project, clientId }) {
                 placeholder="Tell us anything helpful — what kind of business it is, whether they've mentioned needing a website, etc."
               />
             </div>
+
+            {insertError && (
+              <p className="text-red-400 text-xs font-mono p-2 bg-red-400/10 rounded-lg border border-red-400/20">
+                ⚠ {insertError}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between pt-1"></div>
 
             <div className="flex items-center justify-between pt-1">
               <p className="text-white/25 text-xs font-display">
