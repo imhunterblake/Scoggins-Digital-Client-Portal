@@ -19,7 +19,7 @@ import {
   timeAgo,
   Logo,
 } from "../components/UI";
-import ReferralTab from "./ReferralTab";
+// import ReferralTab from "./ReferralTab";
 
 // ── SIDEBAR ────────────────────────────────────────────────────
 function Sidebar({ active, setActive, onSignOut }) {
@@ -30,7 +30,7 @@ function Sidebar({ active, setActive, onSignOut }) {
     { id: "assets", icon: "📁", label: "My Assets" },
     { id: "feedback", icon: "💬", label: "Feedback" },
     { id: "timeline", icon: "📋", label: "Timeline" },
-    { id: "refer", icon: "🎁", label: "Refer a Friend" },
+    // { id: "refer", icon: "🎁", label: "Refer a Friend" },
   ];
 
   function handleNav(id) {
@@ -1058,9 +1058,9 @@ export default function ClientDashboard() {
         {tab === "assets" && <AssetsTab project={project} />}
         {tab === "feedback" && <FeedbackTab project={project} />}
         {tab === "timeline" && <TimelineTab project={project} />}
-        {tab === "refer" && (
+        {/* {tab === "refer" && (
           <ReferralTab project={project} clientId={session?.user?.id} />
-        )}
+        )} */}
       </main>
     </div>
   );
